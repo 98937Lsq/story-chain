@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AI 故事接龙 · 一起编故事</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+    background: linear-gradient(160deg, #eef3ff 0%, #f7ecff 50%, #ffeef4 100%);
+    color: #2d2d44;
+    overflow: hidden;
+  }
+  .app {
+    height: 100dvh;
+    display: flex; flex-direction: column;
+    max-width: 780px; margin: 0 auto; position: relative;
+  }
+  .topbar { padding: 14px 18px 10px; text-align: center; flex-shrink: 0; }
+  .topbar h1 {
+    margin: 0; font-size: 22px; letter-spacing: 1px;
+    background: linear-gradient(90deg, #6c5ce7, #ff7b54, #f368a0);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .topbar p { margin: 4px 0 0; font-size: 12.5px; color: #8a8aa8; }
+
+  .screens { flex: 1; min-height: 0; position: relative; }
+  .screen {
+    position: absolute; inset: 0; display: none; flex-direction: column;
+    padding: 0 16px 16px; animation: fadeIn .35s ease;
+  }
+  .screen.active { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  #screen-start { justify-content: center; align-items: center; }
+  .start-card {
+    background: #fff; border-radius: 28px; padding: 30px 26px 28px;
+    text-align: center; box-shadow: 0 18px 50px rgba(108, 92, 231, .16);
+    max-width: 420px; width: 100%;
+  }
+  .start-emoji { font-size: 54px; line-height: 1; margin-bottom: 8px; }
+  .start-card h2 { margin: 10px 0 14px; font-size: 20px; }
+  .rules {
+    text-align: left; background: #f6f5ff; border-radius: 16px;
+    padding: 14px 16px; font-size: 14.5px; line-height: 2;
+    color: #5a5a7a; margin: 0 0 22px; list-style: none;
+  }
+  .rules b { color: #6c5ce7; }
+
+  .btn {
+    border: none; border-radius: 999px; padding: 12px 22px;
+    font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer;
+    background: #f0eefc; color: #6c5ce7;
+    transition: transform .15s, box-shadow .15s, opacity .15s;
+  }
+  .btn:active { transform: scale(.96); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn.primary {
+    background: linear-gradient(135deg, #7c6cf0, #a78bfa);
+    color: #fff; box-shadow: 0 10px 24px rgba(124, 108, 240, .38);
+  }
+  .btn.big { padding: 15px 40px; font-size: 17px; width: 100%; }
+  .btn.ghost { background: #fff; box-shadow: 0 4px 14px rgba(108,92,231,.14); }
+  .btn.small { padding: 9px 16px; font-size: 13px; }
+  .btn.pulse { animation: pulse 1.2s infinite; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 123, 84, .5); }
+    50% { box-shadow: 0 0 0 12px rgba(255, 123, 84, 0); }
+  }
+
+  .story-head {
+    flex-shrink: 0; display: flex; align-items: center;
+    justify-content: space-between; gap: 10px; padding: 2px 2px 10px;
+  }
+  .progress { display: flex; align-items: center; gap: 8px; }
+  .round-dot { width: 12px; height: 12px; border-radius: 50%; background: #ddd9f5; transition: all .3s; }
+  .round-dot.done { background: linear-gradient(135deg, #7c6cf0, #ff7b54); transform: scale(1.15); }
+  .progress-label { font-size: 12.5px; color: #8a8aa8; margin-left: 4px; }
+
+  .chat {
+    flex: 1; min-height: 0; overflow-y: auto; padding: 6px 4px 14px;
+    display: flex; flex-direction: column; gap: 14px; scroll-behavior: smooth;
+  }
+  .chat::-webkit-scrollbar { width: 6px; }
+  .chat::-webkit-scrollbar-thumb { background: #d9d4f5; border-radius: 3px; }
+
+  .msg { display: flex; align-items: flex-end; gap: 8px; animation: pop .3s ease; }
+  @keyframes pop { from { opacity: 0; transform: translateY(12px) scale(.96); } to { opacity: 1; transform: none; } }
+  .msg.kid { justify-content: flex-end; }
+  .msg.system { justify-content: center; }
+  .avatar { font-size: 26px; flex-shrink: 0; line-height: 1; }
+
+  .bubble {
+    max-width: 78%; padding: 13px 18px; font-size: 16px;
+    line-height: 1.65; border-radius: 20px; word-break: break-word;
+  }
+  .bubble.ai {
+    background: #fff; color: #2d2d44; border-bottom-left-radius: 6px;
+    box-shadow: 0 8px 20px rgba(80, 70, 160, .10);
+  }
+  .bubble.kid {
+    background: linear-gradient(135deg, #7c6cf0, #a78bfa);
+    color: #fff; border-bottom-right-radius: 6px;
+    box-shadow: 0 8px 22px rgba(124, 108, 240, .35);
+  }
+  .bubble.narrator, .bubble.system {
+    align-self: center; max-width: 92%; text-align: center;
+    background: rgba(255,255,255,.75); color: #6a6a8c;
+    font-size: 14.5px; line-height: 1.7; padding: 12px 18px;
+    border-radius: 16px; border: 1px dashed #d7d2f5;
+  }
+  .bubble.system {
+    background: linear-gradient(135deg, #fff4e6, #ffe9f2);
+    color: #a05a2c; border: none; font-weight: 600;
+  }
+  .bubble.thinking { display: flex; gap: 6px; align-items: center; padding: 17px 20px; }
+  .bubble.thinking i {
+    width: 8px; height: 8px; border-radius: 50%; background: #c3bdf0;
+    display: block; animation: bounce 1s infinite;
+  }
+  .bubble.thinking i:nth-child(2) { animation-delay: .15s; }
+  .bubble.thinking i:nth-child(3) { animation-delay: .3s; }
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: .45; }
+    30% { transform: translateY(-7px); opacity: 1; }
+  }
+
+  .understood {
+    font-size: 12px; color: #9a97bd; margin-bottom: 7px;
+    padding-bottom: 7px; border-bottom: 1px dashed #ece9fb; line-height: 1.5;
+  }
+  .understood b { color: #7c6cf0; font-weight: 600; }
+  mark {
+    background: linear-gradient(180deg, transparent 58%, #ffe08a 58%);
+    color: inherit; padding: 0 1px; border-radius: 2px; font-weight: 600;
+  }
+
+  .composer {
+    flex-shrink: 0; display: flex; gap: 9px; background: #fff;
+    border-radius: 999px; padding: 7px 7px 7px 20px;
+    box-shadow: 0 10px 30px rgba(108, 92, 231, .16);
+  }
+  .composer input {
+    flex: 1; border: none; outline: none; font-size: 15.5px;
+    font-family: inherit; color: #2d2d44; background: transparent; min-width: 0;
+  }
+  .composer input::placeholder { color: #b8b8d0; }
+  .composer input:disabled { color: #bbb; }
+  .composer .btn { padding: 11px 22px; font-size: 15px; }
+  .shake { animation: shake .35s; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-7px); }
+    75% { transform: translateX(7px); }
+  }
+
+  .chips {
+    flex-shrink: 0; display: flex; gap: 8px; overflow-x: auto;
+    padding: 10px 2px 4px; scrollbar-width: none;
+  }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip {
+    flex-shrink: 0; background: #fff; border: 1.5px solid #e6e2ff;
+    color: #6c5ce7; border-radius: 999px; padding: 7px 14px;
+    font-size: 13px; font-family: inherit; cursor: pointer; transition: all .15s;
+  }
+  .chip:active { background: #6c5ce7; color: #fff; transform: scale(.95); }
+  .chip:disabled { opacity: .35; }
+
+  #screen-cover { align-items: center; overflow-y: auto; }
+  .cover-wrap {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    width: 100%; padding: 6px 0 14px; min-height: 0;
+  }
+  #coverCanvas {
+    max-width: 100%; max-height: 100%; height: auto; width: auto;
+    border-radius: 22px; box-shadow: 0 22px 55px rgba(50, 40, 120, .35); display: block;
+  }
+  .cover-actions {
+    flex-shrink: 0; display: flex; gap: 10px; flex-wrap: wrap;
+    justify-content: center; padding-bottom: 4px;
+  }
+  .cover-actions .btn { font-size: 14px; padding: 12px 20px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar">
+    <h1>🤖 AI 故事接龙 ✍️</h1>
+    <p>你一句，我一句，一起编一个属于我们的故事</p>
+  </header>
+
+  <div class="screens">
+    <section class="screen active" id="screen-start">
+      <div class="start-card">
+        <div class="start-emoji">📖✨</div>
+        <h2>准备好开始了吗？</h2>
+        <ul class="rules">
+          <li>① 你先说一句话，接着开头往下编</li>
+          <li>② AI 会先「听懂」你的话，再接着往下说</li>
+          <li>③ 说满 <b>3 轮</b>，故事就讲完啦</li>
+          <li>④ 最后一起生成一张<b>故事封面图</b>！</li>
+        </ul>
+        <button class="btn primary big" id="btn-start">开始编故事 🚀</button>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-story">
+      <div class="story-head">
+        <div class="progress">
+          <span id="dots"></span>
+          <span class="progress-label" id="progressLabel">第 0 / 3 轮</span>
+        </div>
+        <button class="btn ghost small" id="finishBtn" disabled>故事讲完啦 →</button>
+      </div>
+
+      <div class="chat" id="chat"></div>
+
+      <div class="composer">
+        <input id="storyInput" type="text" maxlength="60" placeholder="轮到你了，接着编一句话…" autocomplete="off">
+        <button class="btn primary" id="sendBtn">发送</button>
+      </div>
+
+      <div class="chips" id="chips"></div>
+    </section>
+
+    <section class="screen" id="screen-cover">
+      <div class="cover-wrap">
+        <canvas id="coverCanvas" width="700" height="900"></canvas>
+      </div>
+      <div class="cover-actions">
+        <button class="btn primary" id="btn-download">⬇️ 保存封面</button>
+        <button class="btn ghost" id="btn-regen">🎨 换一张</button>
+        <button class="btn ghost" id="btn-restart">🔁 再编一个</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   0. 后端地址（同源部署留空即可）
+   ========================================================= */
+const API_BASE_URL = '';
+
+const $ = s => document.querySelector(s);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+}[c]));
+
+/* =========================================================
+   1. 词库（本地兜底用）
+   ========================================================= */
+const LEX = {
+  characters: ['小狐狸','狐狸','小猫','小狗','小兔子','兔子','小鸟','蝴蝶','蜜蜂','小刺猬','刺猬','小龙','龙','机器人','小精灵','精灵','巨人','男孩','女孩','小明','小雨','阿星','老爷爷','老奶奶','妈妈','爸爸','朋友','伙伴','云朵','云','太阳','月亮','星星','小石头','小树','大树','花','小草','萤火虫','小虫子','小熊','小松鼠'],
+  places: ['森林','山洞','洞里','小河','大海','海边','城堡','家','学校','花园','山顶','天空','后院','窗台','路','门口','房间','厨房','草地','树林','沙漠','雪地','云上','山谷','河边','屋檐','树洞','屋子','广场'],
+  actions: ['走','跑','飞','跳','看','听','找','吃','喝','说','喊','叫','笑','哭','打开','关上','藏','躲','掉','变','发光','抓','抱','追','爬','游','唱','画','写','拿','放','摸','闻','坐','站','睡','醒','等','问','回答','数','吹','捡','推','拉','扔','接','穿','戴','滚','钻'],
+  problems: ['找不到','不见了','没有办法','不知道','太黑','太冷','太热','太高','太远','打不开','走不动','迷路','饿了','渴了','害怕','哭了','摔倒了','受伤','着急']
+};
+
+/* =========================================================
+   2. 故事开头
+   ========================================================= */
+const TOPICS = [
+  { opening: '在森林最深处，住着一只会发光的小狐狸。每天晚上，它都会坐在最大的那棵树下，一颗一颗地数星星。', words: ['小狐狸', '森林', '星星'], hue: '#ff9f43' },
+  { opening: '一天早上，小雨在自家后院发现了一扇只有手掌那么高的小门，门把手上还挂着一把亮闪闪的钥匙。', words: ['小门', '钥匙', '后院'], hue: '#7c6cf0' },
+  { opening: '一朵胖胖的云从天上掉了下来，正好落在小明的书包里，还轻轻打了一个喷嚏。', words: ['云', '书包'], hue: '#74b9ff' },
+  { opening: '垃圾场里，一个旧机器人忽然睁开了眼睛。它说的第一句话是：“请问……你知道回家的路吗？”', words: ['机器人', '路'], hue: '#00b894' },
+  { opening: '山顶的洞里住着一条不会喷火的小龙，它最怕别人问它：“你会喷火吗？”', words: ['小龙', '山洞'], hue: '#e17055' },
+  { opening: '一粒小小的种子从月亮上掉了下来，正好落在阿星的窗台上。到了夜里，它会发出“叮叮”的声音。', words: ['月亮', '种子', '窗台'], hue: '#a29bfe' }
+];
+
+/* =========================================================
+   3. 本地分析（兜底 & 封面关键词）
+   ========================================================= */
+function dedupeLongest(words) {
+  const sorted = [...words].sort((a, b) => b.length - a.length);
+  return sorted.filter(w => !sorted.some(o => o !== w && o.includes(w)));
+}
+function findActionPhrase(text) {
+  let bestIdx = -1, bestLen = 0;
+  for (const v of LEX.actions) {
+    const i = text.indexOf(v);
+    if (i >= 0 && (bestIdx < 0 || i < bestIdx || (i === bestIdx && v.length > bestLen))) {
+      bestIdx = i; bestLen = v.length;
+    }
+  }
+  if (bestIdx < 0) return '';
+  let phrase = text.slice(bestIdx).replace(/[。，！？、；：“”‘’…\s]/g, '');
+  if (phrase.length > 12) phrase = phrase.slice(0, 12);
+  return phrase;
+}
+function analyze(text, memory) {
+  const charsRaw = dedupeLongest(LEX.characters.filter(c => text.includes(c)));
+  const placesRaw = dedupeLongest(LEX.places.filter(p => text.includes(p)));
+  const subject = charsRaw[0] || memory.lastSubject || '';
+  const place = placesRaw[0] || '';
+  let newCharacter = '';
+  for (const c of charsRaw) {
+    if (c !== subject && !memory.entities.has(c)) { newCharacter = c; break; }
+  }
+  const isQuestion = /[吗呢？?]|什么|怎么|为什么|哪|谁|多少|能不能|会不会/.test(text);
+  const dialogueMatch = text.match(/[“「]([^”」]+)[”」]/);
+  const dialogue = !!dialogueMatch || /(说|问|喊|叫|回答|嘟囔|小声说)/.test(text);
+  const problem = LEX.problems.find(p => text.includes(p)) || '';
+  const actionPhrase = findActionPhrase(text);
+  const understood = [];
+  if (subject) understood.push(subject);
+  if (actionPhrase) understood.push(actionPhrase);
+  if (place) understood.push(place);
+  if (newCharacter) understood.push(newCharacter);
+  return { text, subject, place, chars: charsRaw, places: placesRaw, newCharacter, dialogue, isQuestion, problem, actionPhrase, understood: [...new Set(understood)].filter(Boolean).slice(0, 3) };
+}
+
+/* =========================================================
+   4. 本地兜底模板
+   ========================================================= */
+const TPL = {
+  dialogue(a) {
+    const s = a.subject || '小主角';
+    const other = a.newCharacter || pick(['风', '回声', '影子', '大树', '小鸟', '小石头']);
+    const replies = ['别急，我陪你一起！', '真的吗？那我也要去看看！', '答案就在你身后呀。', '我早就知道啦，跟我来。', '你先别动，我去看看。'];
+    return pick([
+      { t: `听${s}这么一说，${other}轻轻开口了：“${pick(replies)}”`, h: [s, other] },
+      { t: `话音刚落，${other}忽然应了一声：“${pick(replies)}”`, h: [s, other] },
+      { t: `${s}的话在${a.place || '四周'}绕了一圈，变成了小小的回声：“${pick(replies)}”`, h: [s, a.place] }
+    ]);
+  },
+  question(a) {
+    const s = a.subject || '小主角';
+    return pick([
+      { t: `当然能！只要${pick(['跟着最亮的那颗星星走', '轻轻说一句“请帮帮我”', '把口袋里的东西分它一半', '闭上眼睛数到十'])}，答案就会自己冒出来。`, h: [s] },
+      { t: `${s}歪着头想了想，说：“也许……我们可以问问${pick(['路过的小鸟', '最老的那棵树', '水里的月亮', '风'])}？”`, h: [s] },
+      { t: `“让我想想……”${s}蹲下来，用手指在地上画呀画，画着画着，忽然“啊”了一声：“我知道了！”`, h: [s] }
+    ]);
+  },
+  problem(a) {
+    const s = a.subject || '小主角';
+    const nc = a.newCharacter || pick(['一只小萤火虫', '一个圆滚滚的小家伙', '一只小刺猬', '一朵会飞的云']);
+    return pick([
+      { t: `别急！${s}抬起头，发现${pick(['天上有一颗特别亮的星星，正一闪一闪地指着方向', '远处有一点小小的亮光，正朝这边慢慢靠近'])}。`, h: [s] },
+      { t: `就在这时，${nc}从旁边钻了出来：“我知道路，跟我来！”`, h: [s, nc] },
+      { t: `${s}深吸一口气，把口袋翻了个底朝天，竟然摸出了${pick(['一张皱巴巴的小地图', '一颗亮晶晶的小石头', '半块没吃完的饼干'])}。`, h: [s] }
+    ]);
+  },
+  newCharacter(a) {
+    const s = a.subject || '小主角';
+    const nc = a.newCharacter;
+    return pick([
+      { t: `${nc}眨了眨眼睛，好奇地问：“你们在做什么呀？”`, h: [nc] },
+      { t: `${nc}一点也不怕生，还从口袋里掏出一颗亮晶晶的糖，分给了大家。`, h: [nc] },
+      { t: `没想到${nc}立刻举起手：“这件事我最拿手啦！”`, h: [nc] },
+      { t: `${s}和${nc}对看了一眼，忍不住一起笑了起来。`, h: [s, nc] }
+    ]);
+  },
+  action(a, m) {
+    const s = a.subject || '小主角';
+    const ap = a.actionPhrase;
+    const place = a.place || m.lastPlace || '这里';
+    return pick([
+      { t: `${s}刚${ap}，就听见身后传来“沙沙沙”的声音。`, h: [s, ap] },
+      { t: `${s}刚${ap}，眼前忽然一亮——地上铺满了会发光的叶子。`, h: [s, ap] },
+      { t: `可是${s}没有想到，${ap}之后，前面的路竟然不见了。`, h: [s, ap] },
+      { t: `就在${s}${ap}的时候，一个小小的影子悄悄跟了上来。`, h: [s, ap] }
+    ]);
+  },
+  scene(a, m) {
+    const place = a.place || m.lastPlace || '四周';
+    const s = a.subject || '小主角';
+    return pick([
+      { t: `突然，${place}深处亮起一点一点的小光，像有人提着一串小灯笼。`, h: [place] },
+      { t: `就在这时，风送来一阵香香的味道，好像有什么好吃的就在附近。`, h: [] },
+      { t: `${place}安静得能听见心跳声——然后，“啪”的一声，什么东西亮了。`, h: [place] }
+    ]);
+  },
+  default(a, m) {
+    const s = a.subject || m.lastSubject || '小主角';
+    const place = a.place || m.lastPlace || '这里';
+    return pick([
+      { t: `就在这时，一件意想不到的事情发生了——${s}的影子竟然自己动了起来！`, h: [s] },
+      { t: `话音刚落，${place}里忽然刮起一阵暖暖的风，把大家的头发都吹乱了。`, h: [place] },
+      { t: `谁也没有注意到，脚下的路正在一点一点地变成彩虹色。`, h: [] }
+    ]);
+  }
+};
+const ENDINGS = [
+  (a, m) => `就这样，${a.place || m.lastPlace || '这里'}里多了一个新的传说。`,
+  (a, m) => `从那以后，${a.subject || m.lastSubject || '大家'}每天都会想起这一天。`,
+  (a, m) => `故事到这里，就在${a.place || '夜色'}里，画上了一个圆圆的句号。`
+];
+
+function buildLocalResponse(userText, memory, round) {
+  const a = analyze(userText, memory);
+  const isLast = round >= state.maxRounds;
+  const types = [];
+  if (a.dialogue) types.push('dialogue');
+  if (a.isQuestion) types.push('question');
+  if (a.problem) types.push('problem');
+  if (a.newCharacter) types.push('newCharacter');
+  if (a.actionPhrase) types.push('action');
+  types.push('scene');
+  if (!types.length) types.push('default');
+
+  const unused = types.filter(t => !memory.usedTypes.has(t));
+  const pool = unused.length ? unused : types;
+  const head = pool.slice(0, Math.min(3, pool.length));
+  const type = head[Math.floor(Math.random() * head.length)];
+  memory.usedTypes.add(type);
+
+  const tpl = TPL[type](a, memory);
+  let text = tpl.t;
+  if (isLast) text += pick(ENDINGS)(a, memory);
+
+  return { text, hl: [...new Set(tpl.h || [])].filter(Boolean), understood: a.understood };
+}
+
+/* =========================================================
+   5. 调用后端
+   ========================================================= */
+async function askAI(userText) {
+  const history = state.memory.log.map(h => ({ role: h.role, text: h.text }));
+  const resp = await fetch(`${API_BASE_URL}/api/continue`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      opening: state.topic.opening,
+      history,
+      round: state.round,
+      maxRounds: state.maxRounds
+    })
+  });
+  if (!resp.ok) throw new Error('后端返回错误');
+  return await resp.json();
+}
+
+/* =========================================================
+   6. 状态
+   ========================================================= */
+const state = {
+  topic: null,
+  round: 0,
+  maxRounds: 3,
+  keywords: [],
+  busy: false,
+  coverTitle: '',
+  memory: null
+};
+function newMemory() {
+  return { lastSubject: '', lastPlace: '', entities: new Set(), usedTypes: new Set(), log: [] };
+}
+
+/* =========================================================
+   7. 屏幕切换
+   ========================================================= */
+const screens = { start: $('#screen-start'), story: $('#screen-story'), cover: $('#screen-cover') };
+function showScreen(name) {
+  Object.values(screens).forEach(s => s.classList.remove('active'));
+  screens[name].classList.add('active');
+}
+
+/* =========================================================
+   8. 流程
+   ========================================================= */
+function startGame() {
+  state.topic = pick(TOPICS);
+  state.round = 0;
+  state.keywords = [...state.topic.words];
+  state.busy = false;
+  state.memory = newMemory();
+
+  const op = analyze(state.topic.opening, state.memory);
+  if (op.subject) state.memory.lastSubject = op.subject;
+  if (op.place) state.memory.lastPlace = op.place;
+  op.chars.forEach(c => state.memory.entities.add(c));
+  op.places.forEach(p => state.memory.entities.add(p));
+
+  $('#chat').innerHTML = '';
+  updateDots();
+  showScreen('story');
+
+  addBubble('narrator', '【故事开头】' + state.topic.opening);
+  addBubble('system', '轮到你了！用一句话接着往下编吧 👇');
+
+  enableInput(true);
+  $('#finishBtn').disabled = true;
+  $('#finishBtn').classList.remove('pulse');
+  $('#finishBtn').textContent = '故事讲完啦 →';
+
+  setTimeout(() => $('#storyInput').focus(), 350);
+}
+
+function updateDots() {
+  const box = $('#dots');
+  box.innerHTML = '';
+  for (let i = 0; i < state.maxRounds; i++) {
+    const d = document.createElement('span');
+    d.className = 'round-dot' + (i < state.round ? ' done' : '');
+    box.appendChild(d);
+  }
+  $('#progressLabel').textContent = `第 ${state.round} / ${state.maxRounds} 轮`;
+}
+
+function enableInput(on) {
+  $('#storyInput').disabled = !on;
+  $('#sendBtn').disabled = !on;
+  document.querySelectorAll('.chip').forEach(c => c.disabled = !on);
+}
+
+function addBubble(type, text) {
+  const chat = $('#chat');
+  const msg = document.createElement('div');
+  if (type === 'kid') {
+    msg.className = 'msg kid';
+    msg.innerHTML = '<div class="bubble kid"></div><span class="avatar">🧒</span>';
+    msg.querySelector('.bubble').textContent = text;
+  } else if (type === 'narrator') {
+    msg.className = 'msg system';
+    msg.innerHTML = '<div class="bubble narrator"></div>';
+    msg.querySelector('.bubble').textContent = text;
+  } else {
+    msg.className = 'msg system';
+    msg.innerHTML = '<div class="bubble system"></div>';
+    msg.querySelector('.bubble').textContent = text;
+  }
+  chat.appendChild(msg);
+  chat.scrollTop = chat.scrollHeight;
+  return msg;
+}
+
+function renderHighlighted(text, hlWords) {
+  const words = [...new Set(hlWords || [])].filter(Boolean);
+  const filtered = words.filter(w => !words.some(o => o !== w && o.includes(w)));
+  let out = escapeHtml(text);
+  for (const w of filtered) {
+    out = out.split(escapeHtml(w)).join(`<mark>${escapeHtml(w)}</mark>`);
+  }
+  return out;
+}
+
+function addAIBubble(res) {
+  const chat = $('#chat');
+  const msg = document.createElement('div');
+  msg.className = 'msg ai';
+  const understoodHtml = (res.understood && res.understood.length)
+    ? `<div class="understood">🤖 听到了：<b>${res.understood.map(escapeHtml).join('</b> · <b>')}</b></div>`
+    : '';
+  msg.innerHTML = `
+    <span class="avatar">🤖</span>
+    <div class="bubble ai">
+      ${understoodHtml}
+      <div class="ai-text">${renderHighlighted(res.text, res.hl)}</div>
+    </div>`;
+  chat.appendChild(msg);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function addThinking() {
+  const chat = $('#chat');
+  const msg = document.createElement('div');
+  msg.className = 'msg ai';
+  msg.innerHTML = '<span class="avatar">🤖</span><div class="bubble ai thinking"><i></i><i></i><i></i></div>';
+  chat.appendChild(msg);
+  chat.scrollTop = chat.scrollHeight;
+  return msg;
+}
+
+async function handleSend() {
+  if (state.busy) return;
+  const input = $('#storyInput');
+  const text = input.value.trim().replace(/\s+/g, ' ');
+
+  if (text.length < 2) {
+    input.classList.add('shake');
+    input.placeholder = '再多说几个字吧～';
+    setTimeout(() => input.classList.remove('shake'), 400);
+    return;
+  }
+
+  state.busy = true;
+  enableInput(false);
+  input.value = '';
+
+  addBubble('kid', text);
+  state.memory.log.push({ role: 'kid', text });
+
+  analyze(text, state.memory).chars.forEach(c => {
+    if (!state.keywords.includes(c)) state.keywords.push(c);
+  });
+
+  state.round++;
+  updateDots();
+  const isLast = state.round >= state.maxRounds;
+
+  const thinking = addThinking();
+
+  let res;
+  try {
+    const ai = await askAI(text);
+    res = {
+      text: ai.reply,
+      understood: (ai.understood && ai.understood.length)
+        ? ai.understood
+        : analyze(text, state.memory).understood,
+      hl: ai.understood || []
+    };
+  } catch (e) {
+    console.warn('后端不可用，回退本地逻辑：', e);
+    res = buildLocalResponse(text, state.memory, state.round);
+  }
+
+  // 保证至少有一点“思考”时间，体验更自然
+  await sleep(300);
+  thinking.remove();
+  addAIBubble(res);
+
+  state.memory.log.push({ role: 'ai', text: res.text });
+
+  const a = analyze(text, state.memory);
+  if (a.subject) state.memory.lastSubject = a.subject;
+  if (a.place) state.memory.lastPlace = a.place;
+  a.chars.forEach(c => state.memory.entities.add(c));
+  a.places.forEach(p => state.memory.entities.add(p));
+
+  if (isLast) {
+    await sleep(450);
+    addBubble('system', '🎉 故事讲完啦！让我们一起把它变成一张故事封面吧～');
+    $('#finishBtn').disabled = false;
+    $('#finishBtn').textContent = '一起做封面 ✨';
+    $('#finishBtn').classList.add('pulse');
+    state.busy = false;
+    enableInput(false);
+  } else {
+    state.busy = false;
+    enableInput(true);
+    input.focus();
+  }
+}
+
+const CHIPS = ['忽然，', '就在这时，', '他大声说：', '可是，', '原来，', '一个发光的小东西', '他们决定'];
+function buildChips() {
+  const box = $('#chips');
+  box.innerHTML = '';
+  CHIPS.forEach(t => {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.textContent = t;
+    b.onclick = () => {
+      const input = $('#storyInput');
+      if (input.disabled) return;
+      input.value += t;
+      input.focus();
+    };
+    box.appendChild(b);
+  });
+}
+
+/* =========================================================
+   9. 封面生成（保持原样）
+   ========================================================= */
+const SCENES = {
+  night: { sky: ['#131a4a', '#3b2e7e', '#7b5cc4'], hill1: '#2a2d63', hill2: '#1b1e4a', bush: '#232655', star: true, moon: true },
+  sunset: { sky: ['#ffd08a', '#ff9a76', '#e26ba0'], hill1: '#8f5aa8', hill2: '#6a3f86', bush: '#5b356f', star: false, sun: true },
+  forest: { sky: ['#d9f4a8', '#a8e063', '#66c26a'], hill1: '#4fa860', hill2: '#2f8a4c', bush: '#1f6b3a', star: false, sun: true },
+  ocean: { sky: ['#c9f0ff', '#7fd8ff', '#3aa8e8'], hill1: '#2196d6', hill2: '#1272b0', bush: '#0d5a91', star: false, sun: true }
+};
+function pickScene() {
+  const all = (state.keywords.join('') + (state.topic ? state.topic.words.join('') : ''));
+  if (/星|月|夜|梦|影|光/.test(all)) return 'night';
+  if (/海|水|河|船|鱼|浪/.test(all)) return 'ocean';
+  if (/森林|树|花|草|狐|龙|兔|鸟|刺猬|蘑菇|山/.test(all)) return 'forest';
+  return pick(['sunset', 'night', 'forest']);
+}
+function makeTitle() {
+  const kw = state.keywords[0] || state.topic.words[0] || '小故事';
+  const adj = pick(['奇妙', '神秘', '快乐', '闪闪发光', '小小']);
+  const noun = pick(['大冒险', '旅行', '秘密', '夜晚', '奇遇记']);
+  return `《${kw}的${adj}${noun}》`;
+}
+function drawStar(ctx, x, y, r, color) {
+  ctx.save(); ctx.translate(x, y); ctx.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const a1 = -Math.PI / 2 + i * Math.PI * 2 / 5;
+    const a2 = a1 + Math.PI / 5;
+    ctx.lineTo(Math.cos(a1) * r, Math.sin(a1) * r);
+    ctx.lineTo(Math.cos(a2) * r * 0.45, Math.sin(a2) * r * 0.45);
+  }
+  ctx.closePath(); ctx.fillStyle = color; ctx.fill(); ctx.restore();
+}
+function drawCharacter(ctx, x, y, scale, hue) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale);
+  ctx.fillStyle = 'rgba(0,0,0,.16)';
+  ctx.beginPath(); ctx.ellipse(0, 68, 78, 16, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = hue;
+  ctx.beginPath(); ctx.ellipse(-46, -56, 24, 40, -0.35, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(46, -56, 24, 40, 0.35, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.45)';
+  ctx.beginPath(); ctx.ellipse(-46, -56, 11, 22, -0.35, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(46, -56, 11, 22, 0.35, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = hue;
+  ctx.beginPath(); ctx.ellipse(0, 0, 58, 62, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.6)';
+  ctx.beginPath(); ctx.ellipse(0, 20, 30, 32, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#2b2b3d';
+  ctx.beginPath(); ctx.ellipse(-21, -10, 9, 11, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(21, -10, 9, 11, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(-24, -14, 3.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(18, -14, 3.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,110,140,.5)';
+  ctx.beginPath(); ctx.ellipse(-40, 10, 13, 8, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(40, 10, 13, 8, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#2b2b3d'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(0, 4, 14, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  ctx.restore();
+}
+function drawCover() {
+  const cv = $('#coverCanvas');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  const S = SCENES[pickScene()];
+
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, S.sky[0]); sky.addColorStop(0.55, S.sky[1]); sky.addColorStop(1, S.sky[2]);
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+
+  if (S.star) {
+    for (let i = 0; i < 110; i++) {
+      const x = Math.random() * W, y = Math.random() * H * 0.7;
+      ctx.globalAlpha = 0.25 + Math.random() * 0.75;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(x, y, Math.random() * 1.8 + 0.5, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    for (let i = 0; i < 7; i++) {
+      drawStar(ctx, Math.random() * W, Math.random() * H * 0.55, 8 + Math.random() * 8, 'rgba(255,255,255,.85)');
+    }
+  }
+
+  const cx0 = W * 0.78, cy0 = H * 0.13;
+  if (S.moon) {
+    ctx.save(); ctx.shadowColor = 'rgba(255,248,190,.95)'; ctx.shadowBlur = 70;
+    ctx.fillStyle = '#fff7cf';
+    ctx.beginPath(); ctx.arc(cx0, cy0, 58, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.fillStyle = 'rgba(225,215,165,.45)';
+    ctx.beginPath(); ctx.arc(cx0 - 18, cy0 - 14, 13, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx0 + 16, cy0 + 16, 9, 0, Math.PI * 2); ctx.fill();
+  } else if (S.sun) {
+    ctx.save(); ctx.shadowColor = 'rgba(255,235,160,.95)'; ctx.shadowBlur = 80;
+    ctx.fillStyle = '#fff0b3';
+    ctx.beginPath(); ctx.arc(cx0, cy0, 55, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  }
+
+  ctx.fillStyle = S.hill1;
+  ctx.beginPath();
+  ctx.moveTo(0, H * 0.68);
+  ctx.quadraticCurveTo(W * 0.28, H * 0.56, W * 0.52, H * 0.66);
+  ctx.quadraticCurveTo(W * 0.78, H * 0.76, W, H * 0.62);
+  ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath(); ctx.fill();
+
+  ctx.fillStyle = S.hill2;
+  ctx.beginPath();
+  ctx.moveTo(0, H * 0.80);
+  ctx.quadraticCurveTo(W * 0.30, H * 0.70, W * 0.58, H * 0.79);
+  ctx.quadraticCurveTo(W * 0.82, H * 0.86, W, H * 0.76);
+  ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath(); ctx.fill();
+
+  ctx.fillStyle = S.bush;
+  [[0.11, 0.745], [0.22, 0.725], [0.76, 0.725], [0.87, 0.745], [0.95, 0.765]].forEach(([px, py]) => {
+    const bx = W * px, by = H * py;
+    ctx.beginPath(); ctx.ellipse(bx, by, 30, 19, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(bx + 20, by + 5, 21, 14, 0, 0, Math.PI * 2); ctx.fill();
+  });
+
+  const px = W * 0.5, py = H * 0.58;
+  const glow = ctx.createRadialGradient(px, py + 30, 20, px, py + 30, 230);
+  glow.addColorStop(0, 'rgba(255,255,255,.5)');
+  glow.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath(); ctx.arc(px, py + 30, 230, 0, Math.PI * 2); ctx.fill();
+
+  drawCharacter(ctx, px, py, 1.15, state.topic ? state.topic.hue : '#ff9f43');
+
+  for (let i = 0; i < 24; i++) {
+    const x = Math.random() * W, y = H * (0.25 + Math.random() * 0.55);
+    ctx.fillStyle = `rgba(255,255,255,${0.25 + Math.random() * 0.5})`;
+    ctx.beginPath(); ctx.arc(x, y, Math.random() * 4 + 2, 0, Math.PI * 2); ctx.fill();
+  }
+
+  const shade = ctx.createLinearGradient(0, H * 0.68, 0, H);
+  shade.addColorStop(0, 'rgba(10,10,35,0)');
+  shade.addColorStop(0.45, 'rgba(10,10,35,.55)');
+  shade.addColorStop(1, 'rgba(8,8,28,.9)');
+  ctx.fillStyle = shade; ctx.fillRect(0, H * 0.68, W, H * 0.32);
+
+  const title = state.coverTitle;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  let size = 62;
+  const fontOf = s => `bold ${s}px "PingFang SC","Microsoft YaHei",sans-serif`;
+  ctx.font = fontOf(size);
+  while (ctx.measureText(title).width > W - 110 && size > 26) {
+    size -= 2; ctx.font = fontOf(size);
+  }
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 16;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(title, W / 2, H * 0.855);
+  ctx.restore();
+
+  ctx.font = '26px "PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,.82)';
+  ctx.fillText('★ 小朋友 & AI 一起创作 ★', W / 2, H * 0.935);
+
+  drawStar(ctx, W * 0.18, H * 0.855, 16, 'rgba(255,220,120,.95)');
+  drawStar(ctx, W * 0.82, H * 0.855, 16, 'rgba(255,220,120,.95)');
+}
+function goCover() {
+  state.coverTitle = makeTitle();
+  showScreen('cover');
+  requestAnimationFrame(() => drawCover());
+}
+
+/* =========================================================
+   10. 事件绑定
+   ========================================================= */
+$('#btn-start').addEventListener('click', startGame);
+$('#sendBtn').addEventListener('click', handleSend);
+$('#storyInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); handleSend(); }
+});
+$('#finishBtn').addEventListener('click', () => {
+  if ($('#finishBtn').disabled) return;
+  goCover();
+});
+$('#btn-regen').addEventListener('click', () => { state.coverTitle = makeTitle(); drawCover(); });
+$('#btn-restart').addEventListener('click', () => { showScreen('start'); });
+$('#btn-download').addEventListener('click', () => {
+  const cv = $('#coverCanvas');
+  const a = document.createElement('a');
+  const name = (state.coverTitle || '故事封面').replace(/[《》]/g, '');
+  a.download = `故事封面_${name}.png`;
+  a.href = cv.toDataURL('image/png');
+  a.click();
+});
+
+buildChips();
+</script>
+</body>
+</html>
